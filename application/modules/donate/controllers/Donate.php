@@ -2,6 +2,9 @@
 
 use MX\MX_Controller;
 
+use Stripe\Stripe;
+use Stripe\Charge;
+
 //API Container
 use PayPal\Rest\ApiContext;
 use PayPal\Auth\OAuthTokenCredential;
@@ -26,9 +29,12 @@ class Donate extends MX_Controller
 
         $this->user->userArea();
 
-        $this->load->config('paypal');
+        $this->load->config('config');
         $this->load->model('donate_model');
         $this->load->model('paypal_model');
+
+        // Configura la clave secreta de Stripe
+        Stripe::setApiKey($this->config->item('stripe_secret_key'));
     }
 
     public function index()
@@ -36,6 +42,8 @@ class Donate extends MX_Controller
         requirePermission("view");
 
         $this->template->setTitle(lang("donate_title", "donate"));
+
+        $donate_paypal = $this->config->item('donate_paypal');
 
         $user_id = $this->user->getId();
 
@@ -47,7 +55,11 @@ class Donate extends MX_Controller
         {
             if ($this->input->post("donation_type") == "paypal")
             {
-                $this->getDonate($this->input->post("data_id"));
+                $this->paypal_model->getDonate($this->input->post("data_id"));
+            }
+            elseif ($this->input->post("donation_type") == "stripe")
+            {
+                $this->stripeCharge();
             }
         }
 
@@ -57,94 +69,50 @@ class Donate extends MX_Controller
             "server_name" => $this->config->item('server_name'),
             "currency" => $this->config->item('donation_currency'),
             "currency_sign" => $this->config->item('donation_currency_sign'),
+            'use_paypal' => (!empty($this->config->item("paypal_userid")) && !empty($this->config->item("paypal_secretpass")) && $this->config->item("use_paypal")) ? true : false,
+            'use_stripe' => (!empty($this->config->item('stripe_publishable_key')) && !empty($this->config->item('stripe_secret_key')) && $this->config->item('use_stripe')) ? true : false,
+            'stripe_publishable_key' => $this->config->item('stripe_publishable_key'),
+            'donation_currency' =>  $this->config->item('donation_currency'),
+            'stripe' => array('values' => array()) // Inicializa con un array vacío si no hay donaciones de Stripe
         );
+		
 
-        $data['use_paypal'] = !empty($this->config->item("paypal_userid")) && !empty($this->config->item("paypal_secretpass")) && $this->config->item("use_paypal");
+        // Agrega información ficticia de Stripe a $data si se está utilizando Stripe
+        if ($data['use_stripe']) {
+            $data['stripe']['values'] = $this->obtenerDatosStripe(); // Reemplaza con tu lógica real
+			
+        }
 
         $output = $this->template->loadPage("donate.tpl", $data);
 
-        // Load the top site page and format the page contents
-        $pageData = array(
+        // Load the page breadcrumb
+        $page_data = array(
             "module" => "default",
-            "headline" => breadcrumb([
+            "headline" => breadcrumb(array(
                             "ucp" => lang("ucp"),
                             "donate" => lang("donate_panel", "donate")
-            ]),
+                        )),
             "content" => $output
         );
 
-        $page = $this->template->loadPage("page.tpl", $pageData);
+        $page = $this->template->loadPage("page.tpl", $page_data);
 
-        //Load the template form
+        // Output the content
         $this->template->view($page, "modules/donate/css/donate.css", "modules/donate/js/donate.js");
     }
-
-    private function getApi()
+	
+	 public function checkPaypal($id)
     {
-        $api = new ApiContext(
-            new OAuthTokenCredential($this->config->item('paypal_userid'), $this->config->item('paypal_secretpass'))
-        );
-
-        $api->setConfig([
-            'mode' => $this->config->item('paypal_mode'),
-            'http.ConnectionTimeOut' => 30,
-            'log.LogEnabled' => false,
-            'log.FileName' => 'paypal_logs',
-            'log.LogLevel' => 'FINE',
-            'validation.level' => 'log'
-        ]);
-
-        return $api;
+        $this->paypal_model->check($id);
     }
-
-    public function checkPaypal($id)
+	
+	public function canceled()
     {
-        $execute = new PaymentExecution();
-
-        $payment_id = $_GET['paymentId'] ?? '';
-        $payerId = $_GET['PayerID'] ?? '';
-        $payment = Payment::get($payment_id, $this->getApi());
-
-        $execute->setPayerId($payerId);
-        try {
-            $result = $payment->execute($execute, $this->getApi());
-
-            $payment_data = array(
-                'payer_email' => $result->payer->payer_info->email,
-                'invoice_number' => $result->transactions[0]->invoice_number,
-                'transactions_code' => $result->transactions[0]->related_resources[0]->sale->id,
-            );
-            $this->paypal_model->update_payment($payment_id, $payment_data);
-
-            $status = $this->paypal_model->getStatus($payment_id);
-
-            if ($status == '1') {
-                redirect(base_url('/donate'));
-            } else {
-                // transaction status
-                $this->paypal_model->setStatus($payment_id, "1");
-
-                $specify_donate = $this->paypal_model->getSpecifyDonate($id);
-
-                // update account
-                $this->donate_model->giveDp($this->user->getId(), $specify_donate['points']);
-
-                // update income
-                $this->donate_model->updateMonthlyIncome($specify_donate['price']);
-
-                redirect(base_url('/donate/success'));
-            }
-        } catch (Exception $e) {
-            $this->paypal_model->setStatus($payment_id, "3");
-            $this->paypal_model->setError($payment_id, $e);
-
-            log_message('error', $e);
-
-            redirect(base_url('/donate/error'));
-        }
+        $this->paypal_model->setCanceled($this->input->get("token"), '2');
+        redirect(base_url('/donate'));
     }
-
-    public function success()
+	
+	public function success()
     {
         $this->user->getUserData();
 
@@ -152,8 +120,8 @@ class Donate extends MX_Controller
 
         $this->template->box(lang("donate_thanks", "donate"), $page, true);
     }
-
-    public function error()
+	
+	 public function error()
     {
         $data = array('msg' => $this->session->userdata('paypal_error'));
 
@@ -162,116 +130,92 @@ class Donate extends MX_Controller
         $this->template->box(lang("donate_error", "donate"), $page, true);
     }
 
-    public function canceled()
+    private function obtenerDatosStripe()
     {
-        $this->paypal_model->setCanceled($this->input->get("token"), '2');
-        redirect(base_url('/donate'));
+        // Consulta la base de datos para obtener los datos de stripe_donate
+        $stripeDonations = $this->paypal_model->getStripeDonations();
+
+        // Verifica si se obtuvieron datos de la base de datos
+        if ($stripeDonations) {
+            $stripeData = array();
+
+            // Construye el array con los datos obtenidos de la base de datos
+            foreach ($stripeDonations as $donation) {
+                $stripeData[] = array(
+                    'id' => $donation->id,
+                    'price' => floatval($donation->price),
+                    'points' => $donation->points,
+                    'description' => $donation->description
+                );
+            }
+			
+			
+
+            return $stripeData;
+        } else {
+            // Maneja la situación donde no se obtuvieron datos de la base de datos
+            return array(); // Devuelve un array vacío si no hay datos
+        }
     }
 
-    private function getDonate($id)
-    {
-        $item = new Item();
-        $payer = new Payer();
-        $amount = new Amount();
-        $details = new Details();
-        $payment = new Payment();
-        $itemList = new ItemList();
-        $transaction = new Transaction();
-        $redirectUrls = new RedirectUrls();
+public function stripeCharge()
+{
+    // Manejar la lógica para realizar una donación a través de Stripe
+    try {
+        // Obtén los datos necesarios para el cargo
+        $token = $this->input->post("stripeToken");
+        $dataId = $this->input->post("data_id");
 
-        $setTax = '0.00';
-        $setPrice = $this->paypal_model->getSpecifyDonate($id)['price'];
-        $setTotal = ($setTax + $setPrice);
+        // Obtén el monto y los puntos desde la base de datos según la ID del producto
+        $donationData = $this->paypal_model->getStripeDonationData($dataId);
 
-        //Payer
-        $payer->setPaymentMethod('paypal');
-
-        //item
-        $item->setName($this->paypal_model->getSpecifyDonate($id)['points'] . ' points')
-            ->setCurrency($this->config->item('donation_currency'))
-            ->setQuantity(1)
-            ->setPrice($setPrice);
-
-        //item list
-        $itemList->setItems([$item]);
-
-        //details
-        $details->setShipping('0.00')
-            ->setTax($setTax)
-            ->setSubtotal($setPrice);
-
-        $amount->setCurrency($this->config->item('donation_currency'))
-            ->setTotal($setTotal)
-            ->setDetails($details);
-
-        //transaction
-        $transaction->setAmount($amount)
-            ->setItemList($itemList)
-            ->setDescription('Purchase ' . $this->paypal_model->getSpecifyDonate($id)['points'] . ' points for user ' . $this->user->getId() . '')
-            ->setInvoiceNumber(uniqid());
-
-        //payment
-        $payment->setIntent('sale')
-            ->setPayer($payer)
-            ->setTransactions([$transaction]);
-
-        //redirect urls
-        $redirectUrls->setReturnUrl(base_url('/donate/checkPaypal/' . $id))
-            ->setCancelUrl(base_url('/donate/canceled'));
-
-        $payment->setIntent('sale')
-            ->setPayer($payer)
-            ->setRedirectUrls($redirectUrls)
-            ->setTransactions([$transaction]);
-
-        try {
-            $payment->create($this->getApi());
-
-            $hash = md5($payment->getId());
-
-            $date = new DateTime($payment->create_time);
-
-            $url_parts = parse_url($payment->links[1]->href,);
-
-            parse_str($url_parts['query'], $query_parts);
-
-            $token = $query_parts['token'];
-
-            //prepare and execute
-            $dataInsert = array(
-                'user_id' => $this->user->getId(),
-                'payment_id' => $payment->getId(),
-                'hash' => $hash,
-                'total' => $payment->transactions[0]->amount->total,
-                'points' => $this->paypal_model->getSpecifyDonate($id)['points'],
-                'create_time' => $date->getTimestamp(),
-                'currency' => $this->config->item('donation_currency'),
-                'error' => '',
-                'status' => '0',
-                'invoice_number' => '',
-                'payer_email' => '',
-                'token' => $token,
-            );
-
-            $this->db->insert('paypal_logs', $dataInsert);
-        } catch (PayPalConnectionException $e) {
-            log_message('error', $e);
-
-            if (preg_match('[500|501|502|503|504|60000]', $e)) {
-                $this->session->set_tempdata('paypal_error', 'PayPal is currently experiencing problems. Please try later', 10);
-                redirect(base_url('/donate/error'));
-            }
-            else
-            {
-                die($e);
-            }
+        // Verifica que los datos sean válidos
+        if (!$donationData) {
+            // Maneja el caso en el que no se obtienen datos válidos
+            redirect(base_url('/donate/error2'));
         }
 
-        foreach ($payment->getLinks() as $link) {
-            if ($link->getRel() == 'approval_url') {
-                $redirectUrl = $link->getHref();
-            }
+        $amount = max(0.50, floatval($donationData->price));
+        $points = $donationData->points;
+
+        // Realiza el cargo a través de Stripe
+        $charge = Charge::create([
+            'amount' => max(1, intval($amount * 100)),  // La cantidad debe ser al menos 1 centavo
+            'currency' => $this->config->item('donation_currency'),
+            'description' => lang("donation_description", "donate"),
+            'source' => $token,
+        ]);
+
+        // Almacena la información en la tabla stripe_logs
+        $stripeLogData = array(
+            'user_id' => $this->user->getId(),
+            'transaction_id' => $charge->id,
+            'amount' => $amount,
+            'currency' => $this->config->item('donation_currency'),
+            'description' => lang("donation_description", "donate"),
+            'amount_received' => $charge->amount_received ?? 'N/A', // Usamos 'N/A' si no está definido
+            'status' => $charge->status
+        );
+
+        $this->paypal_model->insertStripeLog($stripeLogData);
+
+        // Ahora, actualiza los puntos del usuario solo si la transacción fue exitosa
+        if ($charge->status === 'succeeded') {
+            $this->donate_model->giveDp($this->user->getId(), $points);
         }
-        redirect($redirectUrl);
+
+        // Redirecciona a la página de éxito
+        redirect(base_url('/donate/success'));
+    } catch (\Stripe\Exception\CardException $e) {
+        // Maneja errores de tarjeta de crédito
+        redirect(base_url('/donate/canceled'));
+    } catch (\Exception $e) {
+        // Maneja otros errores
+        redirect(base_url('/donate/error'));
     }
 }
+}
+
+
+
+

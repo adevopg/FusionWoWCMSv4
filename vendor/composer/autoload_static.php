@@ -25,6 +25,10 @@ class ComposerStaticInit728f96e67824ff0c88d9b31fcd5c7681
         array (
             'VisualAppeal\\' => 13,
         ),
+        'S' => 
+        array (
+            'Stripe\\' => 7,
+        ),
         'P' => 
         array (
             'Psr\\SimpleCache\\' => 16,
@@ -69,6 +73,10 @@ class ComposerStaticInit728f96e67824ff0c88d9b31fcd5c7681
         'VisualAppeal\\' => 
         array (
             0 => __DIR__ . '/..' . '/fusion-cms/auto-updater/src',
+        ),
+        'Stripe\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/stripe/stripe-php/lib',
         ),
         'Psr\\SimpleCache\\' => 
         array (

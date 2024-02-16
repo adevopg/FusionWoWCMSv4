@@ -23,11 +23,41 @@ class Donate_model extends CI_Model
             return false;
         }
     }
-
-    public function giveDp($user, $dp)
+	
+	 public function connectAuth()
     {
+        if (empty($this->connection)) {
+            $this->connection = $this->load->database("account", true);
+        }
+    }
+	
+	
+	  public function getConnectionAuth()
+    {
+        $this->connectAuth();
+
+        return $this->connection;
+    }
+	
+	
+	
+
+public function giveDp($user, $dp)
+{
+    if ($this->config->item('legion_core')) {
+        $this->connectAuth();
+        $tokenType = 1; 
+        $query = "
+            INSERT INTO account_tokens (account_id, tokenType, amount)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE amount = amount + ?";
+        $this->connection->query($query, array($user, $tokenType, $dp, $dp));
+    } else {
         $this->db->query("UPDATE account_data SET dp = dp + ? WHERE id=?", array($dp, $user));
     }
+}
+
+
 
     public function findByEmail($type, $string)
     {
@@ -84,6 +114,34 @@ class Donate_model extends CI_Model
             $row = $query->result_array();
 
             return $row[0];
+        } else {
+            return false;
+        }
+    }
+
+    public function findByMessageId($type, $string)
+    {
+        $query = $this->db->query("SELECT * FROM " . $type . "_logs WHERE `message_id`=?", array($string));
+
+        if ($query->num_rows())
+        {
+            $row = $query->result_array();
+
+            return $row;
+        } else {
+            return false;
+        }
+    }
+
+    public function findByNumber($type, $string)
+    {
+        $query = $this->db->query("SELECT * FROM " . $type . "_logs WHERE `sender`=?", array($string));
+
+        if ($query->num_rows())
+        {
+            $row = $query->result_array();
+
+            return $row;
         } else {
             return false;
         }
@@ -166,6 +224,7 @@ class Donate_model extends CI_Model
         $this->db->where('id', $id);
         $this->db->delete('paypal_donate');
     }
+
 
     public function getLogs($offset = 0, $limit = 0)
     {

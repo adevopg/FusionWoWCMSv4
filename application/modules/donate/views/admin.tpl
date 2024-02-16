@@ -2,14 +2,14 @@
 	<div class="card" id="donate_articles">
 		<header class="card-header">
 			Last 10 PayPal donations
-            <a href="{$url}donate/admin/settings" class="relative font-sans font-normal text-sm inline-flex items-center justify-center leading-5 no-underline h-8 px-3 py-2 space-x-1 border nui-focus transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed hover:enabled:shadow-none text-muted-700 border-muted-300 dark:text-white dark:bg-muted-700 dark:border-muted-600 dark:hover:enabled:bg-muted-600 hover:enabled:bg-muted-50 dark:active:enabled:bg-muted-700/70 active:enabled:bg-muted-100 rounded-md pull-right">Settings</a>
+            <a href="{$url}donate/admin/settings" class="btn btn-primary btn-sm pull-right">Settings</a>
 		</header>
 
 		<div class="card-body">
 		<form style="margin-top:0px;" onSubmit="Donate.search('paypal'); return false">
 			<div class="input-group mb-3">
 				<input class="form-control" type="text" name="search_paypal" id="search_paypal" placeholder="Search by username, E-Mail or Payment ID">
-				<input class="btn btn-primary" type="submit" value="Search" />
+				<input class="btn btn-primary" type="submit" value="Search">
 			</div>
 		</form>
 
@@ -57,7 +57,7 @@
 			</table>
             <span id="show_more_count" {if $show_more <= 0}style="display:none;"{/if}>
                 <!-- Instead of pagination, just use a "show more" button that will show next X logs every time you press it -->
-                <a id="button_log_count" class="relative font-sans font-normal text-sm inline-flex items-center justify-center leading-5 no-underline h-8 px-3 py-2 space-x-1 border nui-focus transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed hover:enabled:shadow-none text-muted-700 border-muted-300 dark:text-white dark:bg-muted-700 dark:border-muted-600 dark:hover:enabled:bg-muted-600 hover:enabled:bg-muted-50 dark:active:enabled:bg-muted-700/70 active:enabled:bg-muted-100 rounded-md" style="display:block" onClick="Donate.loadMore();">Show more ({$show_more})</a>
+                <a id="button_log_count" class="btn btn-primary btn-sm" style="display:block" onClick="Donate.loadMore();">Show more ({$show_more})</a>
                 <input type="hidden" id="js_load_more" value="{$show_more}">
             </span>
 			</div>
