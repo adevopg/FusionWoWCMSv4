@@ -648,7 +648,7 @@ class External_account_model extends CI_Model
             if ($this->config->item('legion_core')) {
                 $hash = $this->crypto->SHA_PASS_HASH_V2($username, $newPassword);
             } else {
-                $hash = $this->crypto->SHA_PASS_HASH_V2($username, $newPassword);
+                $hash = $this->crypto->SHA_PASS_HASH($username, $newPassword);
             }
             $data[column("account", "sha_pass_hash")] = $hash["verifier"];
         }
