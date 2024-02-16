@@ -51,17 +51,21 @@ class User
     public function getAccountPassword(string $username, string $password): array
     {
         $encryption = $this->CI->config->item('account_encryption');
-
-        if ($encryption == 'SRP6') {
-            $hash = $this->CI->crypto->SRP6($username, $password);
-        } else if ($encryption == 'SRP') {
-            $hash = $this->CI->crypto->SRP($username, $password);
+    
+        if ($this->CI->config->item('legion_core')) {
+            $hash = $this->CI->crypto->SHA_PASS_HASH_V2($username, $password);
         } else {
-            $hash = $this->CI->crypto->SHA_PASS_HASH($username, $password);
+            if ($encryption == 'SRP6') {
+                $hash = $this->CI->crypto->SRP6($username, $password);
+            } else if ($encryption == 'SRP') {
+                $hash = $this->CI->crypto->SRP($username, $password);
+            } else {
+                $hash = $this->CI->crypto->SHA_PASS_HASH($username, $password);
+            }
         }
-
+    
         return $hash;
-    }
+    }    
 
     /**
      * When they log in, this should be called to set all the user details.

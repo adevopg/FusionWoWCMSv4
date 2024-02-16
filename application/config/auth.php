@@ -17,6 +17,9 @@ $config['rbac'] = true;
 
 $config['battle_net'] = true;
 
+
+$config['legion_core'] = false; // https://github.com/dufernst/LegionCore-7.3.5
+
 $config['battle_net_encryption'] = "SPH"; // SRP6_V2, SRP6_V1, SPH
 
 $config['totp_secret'] = true;
