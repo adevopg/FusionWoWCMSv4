@@ -57,7 +57,7 @@ $config['use_stripe'] = true;
  * Check your publishable key in:
  * https://dashboard.stripe.com/apikeys
  */
-$config['stripe_publishable_key'] = "pk_test_51OaRSRGxYslQGbo0aVXN5Qxe2HnZyCBms9DdPP8fsmqhlmZDVlgLKc34mjApnSSB55t7SHbZ3RwLlSHVJD2j7OBH00dgWu60R4";  
+$config['stripe_publishable_key'] = "";  
 
 /**
  * Stripe Secret Key
@@ -65,6 +65,6 @@ $config['stripe_publishable_key'] = "pk_test_51OaRSRGxYslQGbo0aVXN5Qxe2HnZyCBms9
  * Check your secret key in:
  * https://dashboard.stripe.com/apikeys
  */
-$config['stripe_secret_key'] = "sk_test_51OaRSRGxYslQGbo0LntA3GX73HXehGZR9KZTnFwshjni7yMqh9UiQOljtPyrYiaZPtCZI5UuvVPGEM8yUmdNu1Bh00rwaN1TtF"; 
+$config['stripe_secret_key'] = ""; 
 
 ?>
