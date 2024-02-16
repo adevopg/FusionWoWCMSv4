@@ -196,15 +196,60 @@ class Internal_user_model extends CI_Model
         }
     }
 
+  
+
     public function getVp()
     {
+       
+    if ($this->config->item('legion_core')) {
+        $this->connectAuth();  
+        $dp_query = $this->conexion->select_sum('amount')->where('tokenType', 2)->get('account_tokens');
+        if ($dp_query !== false) {
+            $dp_result = $dp_query->row_array();
+            return isset($dp_result['amount']) ? $dp_result['amount'] : 0;
+        } else {
+            return 0;
+        }
+    } else {
         return $this->vp;
     }
+}
+
+    public function connectAuth()
+    {
+        if (empty($this->conexion)) {
+            $this->conexion = $this->load->database("account", true);
+        }
+    }
+	
+	
+	  public function getConnectionAuth()
+    {
+        $this->connectAuth();
+
+        return $this->conexion;
+    }
+	
+
 
     public function getDp()
     {
+       
+    if ($this->config->item('legion_core')) {
+        $this->connectAuth();  
+        $dp_query = $this->conexion->select_sum('amount')->where('tokenType', 1)->get('account_tokens');
+        if ($dp_query !== false) {
+            $dp_result = $dp_query->row_array();
+            return isset($dp_result['amount']) ? $dp_result['amount'] : 0; 
+        } else {
+            return 0;
+        }
+    } else {
         return $this->dp;
     }
+}
+
+    
 
     public function getLocation()
     {
